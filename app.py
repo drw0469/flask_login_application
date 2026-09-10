@@ -17,7 +17,7 @@ import os
 app = Flask(__name__)
 # Replace this with a secure secrect key in production
 # app.config['SECRET_KEY'] = 'super_secret_key'
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
