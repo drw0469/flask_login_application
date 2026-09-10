@@ -157,5 +157,86 @@ class FlaskAuthAppTestCase(unittest.TestCase):
         except UnboundLocalError:
             self.fail("profile() route raised UnboundLocalError due to undefined 'has_errors' variable!")
 
+
+    # ==========================================
+    # ADMIN MODIFICATION & DELETION TESTS
+    # ==========================================
+
+    def test_admin_can_change_user_role(self):
+        """Verify an admin can successfully change a standard user's role."""
+        with self.client.session_transaction() as sess:
+            sess['_user_id'] = '2'  # Admin user ID from setUp()
+            sess['_fresh'] = True
+
+        # Send a POST request to change 'testuser' (ID 1) to 'admin'
+        response = self.client.post('/admin/change-role/1', data={
+            'role': 'admin'
+        }, follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+
+        # Check for key parts of the string so whitespace won't break it
+        self.assertIn(b"Successfully changed testuser", response.data)
+        self.assertIn(b"ADMIN.", response.data)
+
+        # Verify the database updated correctly
+        with app.app_context():
+            updated_user = db.session.get(User, 1)
+            self.assertEqual(updated_user.role, 'admin')
+
+    def test_admin_cannot_change_own_role(self):
+        """Ensure an admin cannot accidentally lock themselves out by changing their own role."""
+        with self.client.session_transaction() as sess:
+            sess['_user_id'] = '2'  # Admin user ID
+            sess['_fresh'] = True
+
+        # Attempt to demote self (ID 2) to 'user'
+        response = self.client.post('/admin/change-role/2', data={
+            'role': 'user'
+        }, follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"You cannot change your own role!", response.data)
+
+        # Verify role remained unchanged in the database
+        with app.app_context():
+            admin_user = db.session.get(User, 2)
+            self.assertEqual(admin_user.role, 'admin')
+
+    def test_admin_can_delete_user(self):
+        """Verify an admin can permanently delete a standard user account."""
+        with self.client.session_transaction() as sess:
+            sess['_user_id'] = '2'  # Admin user ID
+            sess['_fresh'] = True
+
+        # Send a POST request to delete 'testuser' (ID 1)
+        response = self.client.post('/admin/delete-user/1', follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Account testuser has been permanently deleted.", response.data)
+
+        # Verify the user no longer exists in the database
+        with app.app_context():
+            deleted_user = db.session.get(User, 1)
+            self.assertIsNone(deleted_user)
+
+    def test_admin_cannot_delete_self(self):
+        """Ensure an admin cannot accidentally delete their own account."""
+        with self.client.session_transaction() as sess:
+            sess['_user_id'] = '2'  # Admin user ID
+            sess['_fresh'] = True
+
+        # Attempt to delete self (ID 2)
+        response = self.client.post('/admin/delete-user/2', follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"You cannot delete your own account!", response.data)
+
+        # Verify admin still exists in the database
+        with app.app_context():
+            admin_user = db.session.get(User, 2)
+            self.assertIsNotNone(admin_user)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -169,7 +169,7 @@ def change_role(user_id):
         if new_role in ["user", "admin"]:  # Restrict to valid roles
             user_to_update.role = new_role
             db.session.commit()
-            flash(f"Successfully changed {user_to_update.username}'s role to  {new_role.upper()}.", "success")
+            flash(f"Successfully changed {user_to_update.username}'s role to {new_role.upper()}.", "success")
         else:
             flash("Invalid role assignment attempted.", "danger")
     else:
