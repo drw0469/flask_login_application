@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import select
 from functools import wraps
+from datetime import timedelta
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
@@ -27,10 +28,26 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax', # Mitigates Cross-Site Request Forgery (CSRF)
 )
 
+# ==========================================
+# AUTOMATIC SESSION EXPIRATION CONFIG
+# ==========================================
+# 1. Set the inactivity timeout duration (e.g., 5 minutes)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=10)
+
+# 2. Refresh the expiration timer on every active request
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'  # Redirects unauthenticated users here
+
+# Customizes the message flashed when an unauthenticated/expired session hits a protected route
+login_manager.login_message = "Your session has expired due to inactivity. Please log in again."
+login_manager.login_message_category = "info"
 
 # Custom Decorator for Admin-Only Routes
 def admin_required(f):
@@ -101,7 +118,7 @@ class LoginForm(FlaskForm):
 limiter = Limiter(get_remote_address, app=app)
 
 @app.route("/login", methods=["GET", "POST"])
-@limiter.limit("3 per minute")
+# @limiter.limit("3 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
@@ -181,15 +198,79 @@ def delete_user(user_id):
 
     return redirect(url_for("admin_panel"))
 
-
-
-
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     flash("You have been logged out.", "info")
     return redirect(url_for('home'))
+
+# ==========================================
+# USER PROFILE EDITING ROUTES
+# ==========================================
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    if request.method == "POST":
+        new_username = request.form.get("username", "").strip()
+        new_password = request.form.get("password")
+
+        #1. Update Username if changed
+        if new_username and new_username != current_user.username:
+            conflict = db.session.scalars(select(User).filter_by(username=new_username)).first()
+            if conflict:
+                flash("That username is already taken!", "danger")
+                has_errors = True
+            else:
+                current_user.username = new_username
+                flash("Username updated successfully.", "success")
+
+        # 2. Check Password Conditions (Only runs if username validation didn't fail)
+        if new_password and not has_errors:
+            current_user.password = generate_password_hash(new_password, method="scrypt")
+            flash("Password updated successfully.", "success")
+
+        # 3. Commit only if everything passed safely
+        if not has_errors:
+            db.session.commit()
+
+        return redirect(url_for("profile"))
+
+    return render_template("profile.html", user=current_user)
+
+# ==========================================
+# ADMIN-POWERED USER MODIFICATION ROUTES
+# ==========================================
+
+@app.route("/admin/edit-user/<int:user_id>", methods=["POST"])
+@admin_required
+def admin_edit_user(user_id):
+    user_to_edit = db.session.get(User, user_id)
+    if not user_to_edit:
+        flash("User not found.", "danger")
+        return redirect(url_for("admin_panel"))
+
+    admin_action = request.form.get("action_type")  # "username" or "password"
+
+    if admin_action == "username":
+        new_username = request.form.get("username").strip()
+        if new_username and new_username != user_to_edit.username:
+            conflict = db.session.scalars(select(User).filter_by(username=new_username)).first()
+            if conflict:
+                flash(f"Error: Username '{new_username}' is already taken.", "danger")
+                return redirect(url_for("admin_panel"))
+            old_name = user_to_edit.username
+            db.session.commit()
+            flash(f"Changed username from '{old_name}' to '{new_username}'.", "success")
+
+    elif admin_action == "password":
+        new_password = request.form.get("password")
+        if new_password:
+            user_to_edit.password = generate_password_hash(new_password, method="scrypt")
+            flash(f"Successfully forced a password reset for {user_to_edit.username}.", "success")
+
+    return redirect(url_for("admin_panel"))
+
 
 # Initialize database tables
 with app.app_context():
