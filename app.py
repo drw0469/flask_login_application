@@ -136,6 +136,54 @@ def admin_panel():
     all_users = db.session.scalars(select(User)).all()
     return render_template('admin.html', users=all_users)
 
+# Route to change a user's role dynamically
+@app.route("/admin/change-role/<int:user_id>", methods=["POST"])
+@admin_required
+def change_role(user_id):
+    # Prevent admins form accidently changing their 
+    # own role and locking themselves out
+    if user_id == current_user.id:
+        flash("You cannot change your own role!", "danger")
+        return redirect(url_for("admin_panel"))
+
+    user_to_update = db.session.get(User, user_id)
+    if user_to_update:
+        new_role = request.form.get("role")
+        if new_role in ["user", "admin"]:  # Restrict to valid roles
+            user_to_update.role = new_role
+            db.session.commit()
+            flash(f"Successfully changed {user_to_update.username}'s role to  {new_role.upper()}.", "success")
+        else:
+            flash("Invalid role assignment attempted.", "danger")
+    else:
+        flash("User not found.", "danger")
+
+    return redirect(url_for("admin_panel"))
+
+
+# Route to delete accounts permanently
+@app.route("/admin/delete-user/<int:user_id>", methods=["POST"])
+@admin_required
+def delete_user(user_id):
+    # Prevent admins form accidentally deleting themselves
+    if user_id == current_user.id:
+        flash("You cannot delete your own account!", "danger")
+        return redirect(url_for("admin_panel"))
+
+    user_to_delete = db.session.get(User, user_id)
+    if user_to_delete:
+        username_cache = user_to_delete.username
+        db.session.delete(user_to_delete)
+        db.session.commit()
+        flash(f"Account {username_cache} has been permanently deleted.", "success")
+    else:
+        flash("User not found.", "danger")
+
+    return redirect(url_for("admin_panel"))
+
+
+
+
 @app.route("/logout")
 @login_required
 def logout():
