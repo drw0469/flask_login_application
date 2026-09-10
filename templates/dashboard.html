@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
     <h2>Dashboard</h2>
-    <p>Hello, **{{ name }}**! You have successfully accessed your secure area.</p>
+    <p>Hello, **{{ user.username }}**!</p>
+    <p>Your Account Role Account Level is: <strong>{{ user.role.upper() }}</strong></p>
 {% endblock %}
