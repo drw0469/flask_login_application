@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import select
 from functools import wraps
+from datetime import timedelta
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
@@ -27,10 +28,26 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax', # Mitigates Cross-Site Request Forgery (CSRF)
 )
 
+# ==========================================
+# AUTOMATIC SESSION EXPIRATION CONFIG
+# ==========================================
+# 1. Set the inactivity timeout duration (e.g., 5 minutes)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=10)
+
+# 2. Refresh the expiration timer on every active request
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'  # Redirects unauthenticated users here
+
+# Customizes the message flashed when an unauthenticated/expired session hits a protected route
+login_manager.login_message = "Your session has expired due to inactivity. Please log in again."
+login_manager.login_message_category = "info"
 
 # Custom Decorator for Admin-Only Routes
 def admin_required(f):
@@ -101,7 +118,7 @@ class LoginForm(FlaskForm):
 limiter = Limiter(get_remote_address, app=app)
 
 @app.route("/login", methods=["GET", "POST"])
-@limiter.limit("3 per minute")
+# @limiter.limit("3 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
