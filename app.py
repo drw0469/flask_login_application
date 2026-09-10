@@ -198,15 +198,80 @@ def delete_user(user_id):
 
     return redirect(url_for("admin_panel"))
 
-
-
-
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     flash("You have been logged out.", "info")
     return redirect(url_for('home'))
+
+# ==========================================
+# USER PROFILE EDITING ROUTES
+# ==========================================
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    if request.method == "POST":
+        new_username = request.form.get("username", "").strip()
+        new_password = request.form.get("password")
+
+        #1. Update Username if changed
+        if new_username and new_username != current_user.username:
+            conflict = db.session.scalars(select(User).filter_by(username=new_username)).first()
+            if conflict:
+                flash("That username is already taken!", "danger")
+                has_errors = True
+            else:
+                current_user.username = new_username
+                flash("Username updated successfully.", "success")
+
+        # 2. Check Password Conditions (Only runs if username validation didn't fail)
+        if new_password and not has_errors:
+            current_user.password = generate_password_hash(new_password, method="scrypt")
+            flash("Password updated successfully.", "success")
+
+        # 3. Commit only if everything passed safely
+        if not has_errors:
+            db.session.commit()
+
+        return redirect(url_for("profile"))
+
+    return render_template("profile.html", user=current_user)
+
+# ==========================================
+# ADMIN-POWERED USER MODIFICATION ROUTES
+# ==========================================
+
+@app.route("/admin/edit-user/<int:user_id>", methods=["POST"])
+@admin_required
+def admin_edit_user(user_id):
+    user_to_edit = db.session.get(User, user_id)
+    if not user_to_edit:
+        flash("User not found.", "danger")
+        return redirect(url_for("admin_panel"))
+
+    admin_action = request.form.get("action_type")  # "username" or "password"
+
+    if admin_action == "username":
+        new_username = request.form.get("username").strip()
+        if new_username and new_username != user_to_edit.username:
+            conflict = db.session.scalars(select(User).filter_by(username=new_username)).first()
+            if conflict:
+                flash(f"Error: Username '{new_username}' is already taken.", "danger")
+                return redirect(url_for("admin_panel"))
+            old_name = user_to_edit.username
+            db.session.commit()
+            flash(f"Changed username from '{old_name}' to '{new_username}'.", "success")
+
+    elif admin_action == "password":
+        new_password = request.form.get("password")
+        if new_password:
+            user_to_edit.password = generate_password_hash(new_password, method="scrypt")
+            db.session.commit()
+            flash(f"Successfully forced a password reset for {user_to_edit.username}.", "success")
+
+    return redirect(url_for("admin_panel"))
+
 
 # Initialize database tables
 with app.app_context():

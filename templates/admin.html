@@ -9,36 +9,53 @@
             <th>ID</th>
             <th>Username</th>
             <th>Current Role</th>
-            <th>Actions</th>
+            <th>Administrative Interventions</th>
         </tr>
         {% for u in users %}
         <tr>
             <td>{{ u.id }}</td>
             <td>{{ u.username }}</td>
             <td>
-                <span class="role-{{ u.role }}">
+                <span class="status-text {{ 'is-admin' if u.role == 'admin' else 'is-user' }}"></span>
                     {{ u.role.upper() }}
                 </span>
             </td>
             <td>
                 {% if u.id != current_user.id %}
-                    <div style="display: flex; gap: 15px; align-items: center;">
+                    <div style="display: flex; flex-direction: column; gap: 10px; padding: 5px 0;">
                         
-                        <!-- Form 1: Change Role Dropdown -->
-                        <form action="{{ url_for('change_role', user_id=u.id) }}" method="POST" style="margin: 0;">
-                            <select name="role" onchange="this.form.submit()">
-                                <option value="user" {% if u.role == 'user' %}selected{% endif %}>User</option>
-                                <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
-                            </select>
-                        </form>
+                        <!-- Actions Row 1: Role, Username Edit, Password Reset -->
+                        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                            <!-- Form 1: Change Role Dropdown -->
+                            <form action="{{ url_for('change_role', user_id=u.id) }}" method="POST" style="margin: 0;">
+                                <select name="role" onchange="this.form.submit()">
+                                    <option value="user" {% if u.role == 'user' %}selected{% endif %}>User</option>
+                                    <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
+                                </select>
+                            </form>
 
-                        <!-- Form 2: Delete User Button -->
-                        <form action="{{ url_for('delete_user', user_id=u.id) }}" method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to permanently delete this user?');">
-                            <button type="submit" style="background-color: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
-                                Delete
-                            </button>
-                        </form>
+                            <!-- Form 2: Rename User -->
+                            <form action="{{ url_for('admin_edit_user', user_id=u.id) }}" method="POST" style="margin: 0; display: flex; gap: 5px;">
+                                <input type="hidden" name="action_type" value="username">
+                                <input type="text" name="username" value="{{ u.username }}" required style="padding: 2px 5px;">
+                                <button type="submit" style="font-size: 12px; padding: 2px 6px;">Rename</button>
+                            </form>
 
+                            <!-- Form 3: Reset Password -->
+                            <form action="{{ url_for('admin_edit_user', user_id=u.id) }}" method="POST" style="margin: 0; display: flex; gap: 5px;">
+                                <input type="hidden" name="action_type" value="password">
+                                <input type="password" name="password" placeholder="New Password" required style="padding: 2px 5px;">
+                                <button type="submit" style="font-size: 12px; padding: 2px 6px; background: #ffc107; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">Reset Pass</button>
+                            </form>
+
+                            <!-- Form 4: Delete User -->
+                            <form action="{{ url_for('delete_user', user_id=u.id) }}" method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to permanently delete this user?');">
+                                <button type="submit" style="background-color: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    Delete Account
+                                </button>
+                            </form>
+                        </div>
+                        
                     </div>
                 {% else %}
                     <span style="color: #666; font-style: italic;">You (Current Session)</span>
