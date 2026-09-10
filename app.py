@@ -115,7 +115,7 @@ class LoginForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Sign In')
 
-limiter = Limiter(get_remote_address, app=app)
+limiter = Limiter(get_remote_address, app=app, storage_uri="memory://")
 
 @app.route("/login", methods=["GET", "POST"])
 # @limiter.limit("3 per minute")
@@ -214,6 +214,8 @@ def profile():
     if request.method == "POST":
         new_username = request.form.get("username", "").strip()
         new_password = request.form.get("password")
+
+        has_errors = False
 
         #1. Update Username if changed
         if new_username and new_username != current_user.username:
