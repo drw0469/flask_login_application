@@ -267,6 +267,7 @@ def admin_edit_user(user_id):
         new_password = request.form.get("password")
         if new_password:
             user_to_edit.password = generate_password_hash(new_password, method="scrypt")
+            db.session.commit()
             flash(f"Successfully forced a password reset for {user_to_edit.username}.", "success")
 
     return redirect(url_for("admin_panel"))
