@@ -1,9 +1,33 @@
-{% extends "base.html" %}
-{% block content %}
-    <h2>Login</h2>
-    <form method="POST">
-        <p><input type="text" name="username" placeholder="Username" required></p>
-        <p><input type="password" name="password" placeholder="Password" required></p>
-        <p><button type="submit">Login</button></p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+</head>
+<body>
+    <form method="POST" action="">
+        <!-- Automatically injects the CSRF token hidden input -->
+        {{ form.hidden_tag() }}
+        
+        <div>
+            {{ form.username.label }}<br>
+            {{ form.username(size=32) }}
+            {% for error in form.username.errors %}
+                <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}
+        </div>
+        
+        <div>
+            {{ form.password.label }}<br>
+            {{ form.password(size=32) }}
+            {% for error in form.password.errors %}
+                <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}
+        </div>
+        
+        <div>
+            {{ form.submit() }}
+        </div>
     </form>
-{% endblock %}
+</body>
+</html>
