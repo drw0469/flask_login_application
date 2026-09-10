@@ -4,11 +4,28 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import select
 
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired, Length
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+import os
+
 app = Flask(__name__)
 # Replace this with a secure secrect key in production
-app.config['SECRET_KEY'] = 'super_secret_key'
+# app.config['SECRET_KEY'] = 'super_secret_key'
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+app.config.update(
+    SESSION_COOKIE_SECURE=True,    # Only sends cookies over HTTPS
+    SESSION_COOKIE_HTTPONLY=True,  # Prevents JavaScript from reading the cookie
+    SESSION_COOKIE_SAMESITE='Lax', # Mitigates Cross-Site Request Forgery (CSRF)
+)
+
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
@@ -57,14 +74,26 @@ def register():
 
     return render_template('register.html')
 
+
+# Define your form class
+class LoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=4, max=25)])
+    password = PasswordField('Password', validators=[DataRequired()])
+    submit = SubmitField('Sign In')
+
+limiter = Limiter(get_remote_address, app=app)
+
 @app.route("/login", methods=["GET", "POST"])
+# @limiter.limit("3 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
 
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+    form = LoginForm()
+
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
 
         user = db.session.scalars(select(User).filter_by(username=username)).first()
 
@@ -76,7 +105,7 @@ def login():
         else:
             flash("Invalid username or password.", "danger")
 
-    return render_template("login.html")
+    return render_template("login.html", form=form)
 
 @app.route('/dashboard')
 @login_required # This restricts access to authenticated users only
