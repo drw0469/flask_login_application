@@ -260,6 +260,7 @@ def admin_edit_user(user_id):
                 flash(f"Error: Username '{new_username}' is already taken.", "danger")
                 return redirect(url_for("admin_panel"))
             old_name = user_to_edit.username
+            user_to_edit.username = new_username
             db.session.commit()
             flash(f"Changed username from '{old_name}' to '{new_username}'.", "success")
 
