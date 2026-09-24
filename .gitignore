@@ -1,4 +1,4 @@
 .venv
 .env
 instance/database.db
-*.md
+unit-tests.md
